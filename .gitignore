@@ -1,0 +1,27 @@
+# Dependências (Global para backend e frontend)
+node_modules/
+
+# Variáveis de Ambiente (CRÍTICO: Protege as chaves da API)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Compilação do Backend (Node.js/TypeScript)
+dist/
+build/
+
+# Compilação do Frontend (Next.js - preparando para a próxima fase)
+.next/
+out/
+next-env.d.ts
+
+# Logs de erros
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
