@@ -1,74 +1,45 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
-import { supabase } from '../services/supabaseClient';
 import { queueManager } from '../services/QueueManager';
 
 export const uploadRouter = Router();
 
-// Configure multer with memory storage
+// Configura multer com armazenamento em memória
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-uploadRouter.post('/upload', upload.single('file'), async (req: Request, res: Response): Promise<any> => {
+uploadRouter.post('/upload', upload.array('files'), async (req: Request, res: Response): Promise<any> => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file provided.' });
+        const files = req.files as Express.Multer.File[];
+
+        if (!files || files.length === 0) {
+            return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
         }
 
-        const file = req.file;
-        const originalName = file.originalname;
-        // Generate a random file name to avoid collisions
-        const fileName = `${Date.now()}_${Math.round(Math.random() * 1e9)}_${originalName}`;
+        console.log(`[Upload] Recebidos ${files.length} arquivo(s). Enfileirando...`);
 
-        // 1. Upload to Supabase Storage
-        const { data: storageData, error: storageError } = await supabase
-            .storage
-            .from('invoice_files')
-            .upload(fileName, file.buffer, {
-                contentType: file.mimetype,
-            });
+        // Cria uma Promise para cada arquivo, adicionando-o à fila
+        const promises = files.map((file) =>
+            queueManager
+                .enqueue(file.buffer, file.mimetype, file.originalname)
+                .then((data) => ({
+                    file_name: file.originalname,
+                    status: 'concluido' as const,
+                    extracted_data: data,
+                }))
+                .catch((err) => ({
+                    file_name: file.originalname,
+                    status: 'erro' as const,
+                    error: err instanceof Error ? err.message : 'Erro desconhecido ao processar o arquivo.',
+                }))
+        );
 
-        if (storageError) {
-            console.error('Storage upload error:', storageError);
-            return res.status(500).json({ error: 'Failed to upload to storage.' });
-        }
+        // Aguarda TODOS os arquivos serem processados pela fila + Gemini
+        const results = await Promise.all(promises);
 
-        // Get public URL
-        const { data: urlData } = supabase
-            .storage
-            .from('invoice_files')
-            .getPublicUrl(fileName);
-
-        const fileUrl = urlData.publicUrl;
-
-        // 2. Insert into 'invoices' table
-        const { data: invoiceData, error: dbError } = await supabase
-            .from('invoices')
-            .insert({
-                file_name: originalName,
-                file_url: fileUrl,
-                status: 'pendente'
-            })
-            .select('id')
-            .single();
-
-        if (dbError) {
-            console.error('Database insert error:', dbError);
-            return res.status(500).json({ error: 'Failed to save invoice record.' });
-        }
-
-        // 3. Add to Queue 
-        const invoiceId = invoiceData.id;
-        queueManager.push(invoiceId);
-
-        // 4. Return Accepted immediately
-        return res.status(202).json({
-            message: 'Invoice received and queued for processing.',
-            id: invoiceId
-        });
-
+        return res.status(200).json({ results });
     } catch (error) {
         console.error('Upload handler error:', error);
-        return res.status(500).json({ error: 'Internal server error.' });
+        return res.status(500).json({ error: 'Erro interno do servidor.' });
     }
 });
