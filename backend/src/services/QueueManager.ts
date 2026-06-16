@@ -8,6 +8,7 @@ interface QueueItem {
     buffer: Buffer;
     mimeType: string;
     originalName: string;
+    syncSnow: boolean;
     resolve: (value: object) => void;
     reject: (reason: any) => void;
 }
@@ -27,9 +28,9 @@ class QueueManager {
      * Adiciona um arquivo à fila e retorna uma Promise que será resolvida
      * quando o Gemini terminar de processar aquele arquivo.
      */
-    public enqueue(buffer: Buffer, mimeType: string, originalName: string): Promise<object> {
+    public enqueue(buffer: Buffer, mimeType: string, originalName: string, syncSnow: boolean = false): Promise<object> {
         return new Promise((resolve, reject) => {
-            const item: QueueItem = { buffer, mimeType, originalName, resolve, reject };
+            const item: QueueItem = { buffer, mimeType, originalName, syncSnow, resolve, reject };
             this.queue.push(item);
 
             console.log(`[Queue] Adicionado "${originalName}". Tamanho da fila: ${this.queue.length}`);
@@ -70,18 +71,23 @@ class QueueManager {
                 const invoices = await InvoiceExtractor.extractData(item.buffer, item.mimeType, item.originalName);
                 console.log(`[Gemini] Sucesso em "${item.originalName}". ${invoices.length} nota(s) extraída(s).`);
 
-                // 2. Envia CADA nota para o ServiceNow como um registro separado
+                // 2. Envia CADA nota para o ServiceNow como um registro separado (se syncSnow for true)
                 const results: object[] = [];
                 for (let i = 0; i < invoices.length; i++) {
                     const invoice = invoices[i];
-                    try {
-                        console.log(`[QueueManager] Enviando nota ${i + 1}/${invoices.length} de "${item.originalName}" para o ServiceNow...`);
-                        const recordId = await this.snowClient.createInvoiceRecord(invoice, item.originalName, item.buffer, item.mimeType);
-                        console.log(`[QueueManager] Registro criado: ${recordId}`);
-                        results.push({ ...invoice, ticket_servicenow: recordId });
-                    } catch (snowError: any) {
-                        console.error(`[QueueManager] Erro ao enviar nota ${i + 1} para o ServiceNow: ${snowError.message}`);
-                        results.push({ ...invoice, ticket_servicenow: "ERRO_AO_CRIAR_TICKET" });
+                    if (item.syncSnow) {
+                        try {
+                            console.log(`[QueueManager] Enviando nota ${i + 1}/${invoices.length} de "${item.originalName}" para o ServiceNow...`);
+                            const recordId = await this.snowClient.createInvoiceRecord(invoice, item.originalName, item.buffer, item.mimeType);
+                            console.log(`[QueueManager] Registro criado: ${recordId}`);
+                            results.push({ ...invoice, ticket_servicenow: recordId });
+                        } catch (snowError: any) {
+                            console.error(`[QueueManager] Erro ao enviar nota ${i + 1} para o ServiceNow: ${snowError.message}`);
+                            results.push({ ...invoice, ticket_servicenow: "ERRO_AO_CRIAR_TICKET" });
+                        }
+                    } else {
+                        // Integração opcional: apenas extrai os dados
+                        results.push(invoice);
                     }
                 }
 

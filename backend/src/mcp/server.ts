@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import * as fs from 'fs';
 import * as path from 'path';
-import mime from 'mime-types'; // Não temos mime-types instalado? Podemos usar uma lógica simples baseada na extensão
+// Importação de mime-types removida, pois estamos fazendo a verificação pela extensão manualmente
 import { InvoiceExtractor } from '../services/InvoiceExtractor';
 import { ServiceNowClient } from '../services/ServiceNowClient';
 
@@ -43,24 +43,32 @@ server.tool(
 
             // 3. Extrair dados via Gemini
             console.error(`[MCP] Iniciando extração com Gemini...`);
-            const invoiceData = await InvoiceExtractor.extractData(buffer, mimeType, fileName);
-            console.error(`[MCP] Extração concluída. Fornecedor: ${invoiceData.fornecedor}`);
+            const invoices = await InvoiceExtractor.extractData(buffer, mimeType, fileName);
+            console.error(`[MCP] Extração concluída. ${invoices.length} nota(s) encontrada(s).`);
 
             // 4. Enviar para o ServiceNow (com arquivo para anexo)
             console.error(`[MCP] Enviando dados para o ServiceNow...`);
             const snowClient = new ServiceNowClient();
-            const recordId = await snowClient.createInvoiceRecord(invoiceData, fileName, buffer, mimeType);
-            console.error(`[MCP] Sucesso! Registro ${recordId}`);
+            
+            let resultText = `Sucesso! A(s) nota(s) fiscal(is) do arquivo "${fileName}" foram processadas e enviadas ao ServiceNow.\n\n`;
+
+            for (let i = 0; i < invoices.length; i++) {
+                const invoice = invoices[i];
+                const recordId = await snowClient.createInvoiceRecord(invoice, fileName, buffer, mimeType);
+                console.error(`[MCP] Sucesso na nota ${i+1}! Registro ${recordId}`);
+                
+                resultText += `--- Nota ${i+1} ---\n` +
+                              `Registro ID: ${recordId}\n` +
+                              `Fornecedor: ${invoice.fornecedor}\n` +
+                              `Valor Bruto: ${invoice.valor_bruto}\n` +
+                              `Centro de Custo: ${invoice.centro_de_custo}\n\n`;
+            }
 
             return {
                 content: [
                     { 
                         type: "text", 
-                        text: `Sucesso! A nota fiscal "${fileName}" foi processada e enviada ao ServiceNow.\n` +
-                              `Registro ID: ${recordId}\n` +
-                              `Fornecedor: ${invoiceData.fornecedor}\n` +
-                              `Valor Bruto: ${invoiceData.valor_bruto}\n` +
-                              `Centro de Custo: ${invoiceData.centro_de_custo}`
+                        text: resultText.trim()
                     }
                 ]
             };

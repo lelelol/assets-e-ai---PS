@@ -19,9 +19,12 @@ uploadRouter.post('/upload', upload.array('files'), async (req: Request, res: Re
         console.log(`[Upload] Recebidos ${files.length} arquivo(s). Enfileirando...`);
 
         // Cria uma Promise para cada arquivo, adicionando-o à fila
+        // A flag sync_snow define se os dados devem ser enviados para o ServiceNow
+        const syncSnow = req.body.sync_snow === 'true';
+
         const promises = files.map((file) =>
             queueManager
-                .enqueue(file.buffer, file.mimetype, file.originalname)
+                .enqueue(file.buffer, file.mimetype, file.originalname, syncSnow)
                 .then((data) => ({
                     file_name: file.originalname,
                     status: 'concluido' as const,
