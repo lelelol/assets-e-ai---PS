@@ -20,7 +20,7 @@ class QueueManager {
     private queue: QueueItem[] = [];
     private timer: NodeJS.Timeout | null = null;
     private readonly MAX_SIZE = 5;
-    private readonly TIMEOUT_MS = 10000;
+    private readonly TIMEOUT_MS = 2000;
 
     constructor() {}
 
