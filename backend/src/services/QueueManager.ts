@@ -9,6 +9,9 @@ interface QueueItem {
     mimeType: string;
     originalName: string;
     syncSnow: boolean;
+    snowInstance?: string;
+    snowUser?: string;
+    snowPass?: string;
     resolve: (value: object) => void;
     reject: (reason: any) => void;
 }
@@ -18,19 +21,16 @@ class QueueManager {
     private timer: NodeJS.Timeout | null = null;
     private readonly MAX_SIZE = 5;
     private readonly TIMEOUT_MS = 10000;
-    private snowClient: ServiceNowClient;
 
-    constructor() {
-        this.snowClient = new ServiceNowClient();
-    }
+    constructor() {}
 
     /**
      * Adiciona um arquivo à fila e retorna uma Promise que será resolvida
      * quando o Gemini terminar de processar aquele arquivo.
      */
-    public enqueue(buffer: Buffer, mimeType: string, originalName: string, syncSnow: boolean = false): Promise<object> {
+    public enqueue(buffer: Buffer, mimeType: string, originalName: string, syncSnow: boolean = false, snowInstance?: string, snowUser?: string, snowPass?: string): Promise<object> {
         return new Promise((resolve, reject) => {
-            const item: QueueItem = { buffer, mimeType, originalName, syncSnow, resolve, reject };
+            const item: QueueItem = { buffer, mimeType, originalName, syncSnow, snowInstance, snowUser, snowPass, resolve, reject };
             this.queue.push(item);
 
             console.log(`[Queue] Adicionado "${originalName}". Tamanho da fila: ${this.queue.length}`);
@@ -77,8 +77,11 @@ class QueueManager {
                     const invoice = invoices[i];
                     if (item.syncSnow) {
                         try {
+                            // Instancia o client para CADA chamada com as credenciais especificas daquela requisição
+                            const snowClient = new ServiceNowClient(item.snowInstance!, item.snowUser!, item.snowPass!);
+                            
                             console.log(`[QueueManager] Enviando nota ${i + 1}/${invoices.length} de "${item.originalName}" para o ServiceNow...`);
-                            const recordId = await this.snowClient.createInvoiceRecord(invoice, item.originalName, item.buffer, item.mimeType);
+                            const recordId = await snowClient.createInvoiceRecord(invoice, item.originalName, item.buffer, item.mimeType);
                             console.log(`[QueueManager] Registro criado: ${recordId}`);
                             results.push({ ...invoice, ticket_servicenow: recordId });
                         } catch (snowError: any) {

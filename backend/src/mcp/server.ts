@@ -48,7 +48,13 @@ server.tool(
 
             // 4. Enviar para o ServiceNow (com arquivo para anexo)
             console.error(`[MCP] Enviando dados para o ServiceNow...`);
-            const snowClient = new ServiceNowClient();
+            
+            // O MCP usa as credenciais do .env por padrão
+            const snowInstance = process.env.SNOW_INSTANCE || '';
+            const snowUser = process.env.SNOW_USERNAME || '';
+            const snowPass = process.env.SNOW_PASSWORD || '';
+            
+            const snowClient = new ServiceNowClient(snowInstance, snowUser, snowPass);
             
             let resultText = `Sucesso! A(s) nota(s) fiscal(is) do arquivo "${fileName}" foram processadas e enviadas ao ServiceNow.\n\n`;
 

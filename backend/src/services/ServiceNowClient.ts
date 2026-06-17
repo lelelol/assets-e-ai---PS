@@ -9,10 +9,13 @@ export class ServiceNowClient {
     private username: string;
     private password: string;
 
-    constructor() {
-        this.instanceUrl = process.env.SNOW_INSTANCE || '';
-        this.username = process.env.SNOW_USERNAME || '';
-        this.password = process.env.SNOW_PASSWORD || '';
+    constructor(instanceUrl: string, username: string, password: string) {
+        if (!instanceUrl || !username || !password) {
+            throw new Error('Credenciais do ServiceNow não fornecidas.');
+        }
+        this.instanceUrl = instanceUrl;
+        this.username = username;
+        this.password = password;
     }
 
     /**

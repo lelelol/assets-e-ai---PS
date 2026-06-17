@@ -22,9 +22,19 @@ uploadRouter.post('/upload', upload.array('files'), async (req: Request, res: Re
         // A flag sync_snow define se os dados devem ser enviados para o ServiceNow
         const syncSnow = req.body.sync_snow === 'true';
 
+        const snowInstance = req.body.snow_instance;
+        const snowUser = req.body.snow_user;
+        const snowPass = req.body.snow_pass;
+
+        if (syncSnow) {
+            if (!snowInstance || !snowUser || !snowPass) {
+                return res.status(400).json({ error: 'Para sincronizar com o ServiceNow (sync_snow=true), os campos snow_instance, snow_user e snow_pass são obrigatórios.' });
+            }
+        }
+
         const promises = files.map((file) =>
             queueManager
-                .enqueue(file.buffer, file.mimetype, file.originalname, syncSnow)
+                .enqueue(file.buffer, file.mimetype, file.originalname, syncSnow, snowInstance, snowUser, snowPass)
                 .then((data) => ({
                     file_name: file.originalname,
                     status: 'concluido' as const,
