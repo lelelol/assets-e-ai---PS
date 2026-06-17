@@ -7,7 +7,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/invoices', uploadRouter);
+import { authMiddleware } from './middlewares/authMiddleware';
+
+app.use('/api/invoices', authMiddleware, uploadRouter);
 
 const PORT = process.env.PORT || 3001;
 
