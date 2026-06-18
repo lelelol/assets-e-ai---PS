@@ -99,6 +99,7 @@ Retorne ESTRITAMENTE um JSON válido no formato de ARRAY (lista), onde cada elem
 REGRAS IMPORTANTES:
 - SEMPRE retorne um ARRAY, mesmo que só tenha 1 nota. Ex: [ { ... } ]
 - Se o arquivo tiver MÚLTIPLAS notas fiscais (ex: XML com várias NFe), retorne um objeto para CADA nota.
+- Se o arquivo analisado NÃO for uma nota fiscal (ex: contrato, recibo simples, foto irrelevante), defina necessidade_aprovacao ESTRITAMENTE como true e confianca_leitura como 0.
 - valor_bruto e valor_liquido devem ser NUMEROS (float), nunca strings. Ex: 1500.50
 - confianca_leitura deve ser um NUMERO inteiro de 0 a 100, nunca string. Se conseguiu extrair os dados com clareza, retorne 85 ou mais.
 - necessidade_aprovacao deve ser true se valor_bruto > 1000
